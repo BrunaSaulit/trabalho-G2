@@ -13,7 +13,7 @@
 import pygame
 import random
 import os
-
+print("teste")
 # Inicializa o PyGame
 pygame.init()
 
