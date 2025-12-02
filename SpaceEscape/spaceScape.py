@@ -1,11 +1,11 @@
 ##############################################################
-###            S P A C E   E S C A P E                   ###
+###             S P A C E  E S C A P E                     ###
 ##############################################################
-###                      versao Alpha 0.3 ###
+###                   versao Alpha 0.3 ###
 ##############################################################
-### Objetivo: desviar dos meteoros que caem.             ###
+### Objetivo: desviar dos meteoros que caem.               ###
 ### Cada colisão tira uma vida. Sobreviva o máximo que     ###
-### conseguir!                                           ###
+### conseguir!                                             ###
 ##############################################################
 ### Prof. Filipo Novo Mor - github.com/ProfessorFilipo     ###
 ##############################################################
@@ -80,13 +80,13 @@ def load_sound(filename):
     return None
 
 # ----------------------------------------------------------
-# FUNÇÃO PRINCIPAL DO JOGO (LEVEL)
+# FUNÇÃO PRINCIPAL DO JOGO
 # ----------------------------------------------------------
 
 def start_game(level=1, current_score=0, current_lives=5):
 
     # ----------------------------------------------------------
-    # AJUSTES DE REINÍCIO POR FASE
+    # REINÍCIO POR FASE
     # ----------------------------------------------------------
 
     lives = 5
@@ -97,14 +97,20 @@ def start_game(level=1, current_score=0, current_lives=5):
     meteor_speed_mult = 1.0 + (level - 1) * 0.2
     nave_speed_mult = 1.0 + (level - 1) * 0.15
 
+    base_meteor_speed = 5
+    nave_speed = 1.5 * nave_speed_mult
+
+    # Taxa de surgimento (Quanto menor o valor, mais rápido aparecem)
+    # Nível 1: 60 (1 inimigo/segundo) | Nível 2: 40 | Nível 3: 30
+    spawn_rate = max(30, 60 - (level - 1) * 20)
+    spawn_counter = 0
 
     # Imagens e Sons
     background = load_image(ASSETS["background"], WHITE, (WIDTH, HEIGHT))
     # Meteoro Normal (-1 vida)
     meteor_img_normal = load_image(ASSETS["meteor"], RED, (70, 70))
     # Meteoro Forte (-2 vidas)
-    meteor_img_strong = load_image(ASSETS["meteor_strong"], PURPLE, (80, 80))
-    # Meteoro Level 3 / Mortal (-3 vidas)
+    # Meteoro Level 3 (-3 vidas)
     meteor_img_level3 = load_image(ASSETS["meteor_deadly"], LEVEL3_COLOR, (90, 90))
 
     nave_img = load_image(ASSETS["nave"], BLUE, (50, 50))
@@ -115,98 +121,54 @@ def start_game(level=1, current_score=0, current_lives=5):
     yoda_win_img = load_image("YODA-WIN.png", GREEN, (150, 150))
     yoda_win_rect = yoda_win_img.get_rect()
 
-    # Imagem de Game Over (Yoda Triste)
+    # Imagem de Game Over
     yoda_sad_img = load_image(ASSETS["yoda_sad"], RED, (150, 150))
     yoda_sad_rect = yoda_sad_img.get_rect()
 
-    player_nave_rect = player_nave_img.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+    player_nave_rect = player_nave_img.get_rect(center=(WIDTH // 2, HEIGHT - 100))
     player_nave_speed = 6
     bullet_speed = 10
     can_shoot = True
 
     bullets = []
 
-    # --- GERAÇÃO DE OBSTÁCULOS POR NÍVEL ---
-
+    # --- LISTAS DE OBSTÁCULOS ---
     nave_list = []
     meteor_list = []
 
-    # Base de meteoros normais para todos os níveis
-    meteor_count_base = 5 + (level - 1) * 2
-
-    # Resetando a contagem dos meteoros fatais
-    meteor_count_deadly = 0
-
-    # --- NÍVEL 1: Apenas Meteoros Normais (-1 vida) ---
-    if level == 1:
-        num_naves = 0
-        meteor_count_normal = meteor_count_base
-
-    # --- NÍVEL 2: Meteoros Normais (-1) e Naves (-2) ---
-    elif level == 2:
-        num_naves = 2
-        # Diminui um normal para adicionar as naves
-        meteor_count_normal = meteor_count_base - 1
-
-    # --- NÍVEL 3+: Meteoros Normais (-1), Naves (-2) e Meteoro Level 3 (-3) ---
-    elif level >= 3:
-        num_naves = 3
-        # Diminui mais para balancear a dificuldade do meteoro mortal
-        meteor_count_normal = meteor_count_base - 2
-        # Define a quantidade de meteoro mortal (Tipo 3) para Nível 3+
-        meteor_count_deadly = 1
-
-
     # ---------------------------------
-    # GERAÇÃO DE OBSTÁCULOS
+    # PLAYER
     # ---------------------------------
-
-    # Meteoros Normais (TIPO 1: -1 vida, +5 pontos)
-    for _ in range(meteor_count_normal):
-        x = random.randint(0, WIDTH - 70)
-        y = random.randint(-500, -40)
-        meteor_list.append({
-            'rect': pygame.Rect(x, y, 70, 70),
-            'type': 1,
-            'img': meteor_img_normal,
-            'speed_mult': meteor_speed_mult
-        })
-
-    # Naves Inimigas (Nave: -2 vidas, +10 pontos) - Apenas Nível 2+
-    if level >= 2:
-        for _ in range(num_naves):
-            x = random.randint(0, WIDTH - 50)
-            y = random.randint(-600, -50)
-            nave_list.append(pygame.Rect(x, y, 50, 50))
-
-    # Meteoro Level 3 (TIPO 3: -3 vidas, +5 pontos) - APENAS NÍVEL 3+
-    if level >= 3:
-        for _ in range(meteor_count_deadly):
-            x = random.randint(0, WIDTH - 90)
-            y = random.randint(-1000, -200)
-            meteor_list.append({
-                'rect': pygame.Rect(x, y, 90, 90),
-                'type': 3, # Mortal: -3 vidas
-                'img': meteor_img_level3,
-                'speed_mult': meteor_speed_mult
-            })
-
-    base_meteor_speed = 5
-    nave_speed = 1.5 * nave_speed_mult
-
-    # PLAYER (YODA)
+    
     player_frames = []
-    for i in range(1, 3):
+    
+    if level == 1:
+        # NÍVEL 1:
+        frame_names = ["YODA-LEVEL1-1.png", "YODA-LEVEL1-2.png"]
+    elif level == 2:
+        # NÍVEL 2:
+        frame_names = ["YODA-LEVEL2-1.png", "YODA-LEVEL2.png"]
+    elif level >= 3:
+        # NÍVEL 3+:
+        frame_names = ["YODA-LEVEL3-1.png", "YODA-LEVEL3.png"]
+
+    # 2. Carregar os frames
+    for name in frame_names:
+        full_path = os.path.join("YODA-PNG", name)
         try:
-            img = load_image(f"YODA-PNG/YODA-LEVEL1-{i}.png", GREEN, (80, 60))
+            img = load_image(full_path, GREEN, (80, 60))
             player_frames.append(img)
         except pygame.error:
+            # se a imagem não for encontrada
+            print(f"Erro ao carregar imagem: {full_path}.")
             player_frames.append(load_image(None, GREEN, (80, 60)))
+
 
     player_index = 0
     player_anim_speed = 15
     player_anim_counter = 0
-    player_rect = player_frames[0].get_rect(center=(WIDTH // 2, HEIGHT - 60))
+    # Inicializa posição do Yoda abaixo da nave
+    player_rect = player_frames[0].get_rect(center=(player_nave_rect.centerx, player_nave_rect.bottom + 10))
     player_speed = 7
 
     # Estados
@@ -228,10 +190,7 @@ def start_game(level=1, current_score=0, current_lives=5):
     background_speed = 10
     frame_counter = 0
 
-    # **INÍCIO DA CORREÇÃO DE LENTIDÃO**
-    # ----------------------------------------------------------
-    # PRÉ-CARREGAMENTO DAS IMAGENS DE GAME OVER (AQUI É MAIS RÁPIDO)
-    # ----------------------------------------------------------
+    # IMAGENS DE GAME OVER
     gameover_frames = []
     for i in range(1, 6):
         try:
@@ -254,6 +213,52 @@ def start_game(level=1, current_score=0, current_lives=5):
     # CRONÔMETRO
     tempo_inicio = pygame.time.get_ticks()
 
+    def spawn_enemy():
+        
+        # Inimigos possíveis no nível atual
+        enemy_choices = [1]
+        
+        if level >= 2:
+            enemy_choices.extend([1] * 3 + [2])
+        
+        if level >= 3:
+            enemy_choices.extend([1] * 2 + [3])
+
+        # Seleciona o tipo de inimigo
+        enemy_type = random.choice(enemy_choices)
+        
+        # Meteoro Tipo 1: -1 Vida
+        if enemy_type == 1:
+            size = 70
+            x = random.randint(0, WIDTH - size)
+            y = random.randint(-150, -40)
+            meteor_list.append({
+                'rect': pygame.Rect(x, y, size, size),
+                'type': 1,
+                'img': meteor_img_normal,
+                'speed_mult': meteor_speed_mult
+            })
+        
+        # Nave Inimiga: -2 Vidas
+        elif enemy_type == 2 and level >= 2:
+            size = 50
+            x = random.randint(0, WIDTH - size)
+            y = random.randint(-300, -80)
+            nave_list.append(pygame.Rect(x, y, size, size))
+
+        # Meteoro Tipo 3: -3 Vidas
+        elif enemy_type == 3 and level >= 3:
+            size = 90
+            x = random.randint(0, WIDTH - size)
+            y = random.randint(-500, -100)
+            meteor_list.append({
+                'rect': pygame.Rect(x, y, size, size),
+                'type': 3,
+                'img': meteor_img_level3,
+                'speed_mult': meteor_speed_mult
+            })
+
+
     # ----------------------------------------------------------
     # LOOP PRINCIPAL DO JOGO
     # ----------------------------------------------------------
@@ -269,23 +274,45 @@ def start_game(level=1, current_score=0, current_lives=5):
             venceu = True
             running = False
 
+        # --- CONTROLE DINÂMICO ---
+        if running: # Somente gera inimigos se o jogo estiver rodando
+            spawn_counter += 1
+            if spawn_counter >= spawn_rate:
+                spawn_enemy()
+                spawn_counter = 0
+
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
+            # -----------------------------------------------
             # TIRO
+            # -----------------------------------------------
             if event.type == pygame.KEYDOWN:
+                # Espaço dispara os tiros
                 if event.key == pygame.K_SPACE and can_shoot:
-                    bullet_rect = bullet_img.get_rect(
-                        center=(player_nave_rect.centerx, player_nave_rect.top)
+                    
+                    # 1. TIRO DA NAVE
+                    bullet_nave = bullet_img.get_rect(
+                        center=(player_nave_rect.centerx, player_nave_rect.top) 
                     )
-                    bullets.append(bullet_rect)
+                    bullets.append(bullet_nave)
+                    
+                    # 2. TIRO DO YODA
+                    bullet_yoda = bullet_img.get_rect(
+                        center=(player_rect.centerx, player_rect.top) 
+                    )
+                    bullets.append(bullet_yoda)
+
                     can_shoot = False
 
             if event.type == pygame.KEYUP:
+                # O espaço solto permite novo tiro
                 if event.key == pygame.K_SPACE:
                     can_shoot = True
+            # -----------------------------------------------
 
         # Renderização do fundo e animação do Yoda
         frame_counter += 1
@@ -305,17 +332,32 @@ def start_game(level=1, current_score=0, current_lives=5):
         # MOVIMENTOS
         keys = pygame.key.get_pressed()
 
+        # MOVIMENTO DA NAVE (W, A, S, D)
+        # Horizontal
+        if keys[pygame.K_a] and player_nave_rect.left > 0:
+            player_nave_rect.x -= player_nave_speed
+        if keys[pygame.K_d] and player_nave_rect.right < WIDTH:
+            player_nave_rect.x += player_nave_speed
+
+        # Vertical
+        if keys[pygame.K_w] and player_nave_rect.top > 0:
+            player_nave_rect.y -= player_nave_speed
+        if keys[pygame.K_s] and player_nave_rect.bottom < HEIGHT:
+            player_nave_rect.y += player_nave_speed
+
+        # MOVIMENTO DO YODA (SETAS)
+        # Horizontal
         if keys[pygame.K_LEFT] and player_rect.left > 0:
             player_rect.x -= player_speed
         if keys[pygame.K_RIGHT] and player_rect.right < WIDTH:
             player_rect.x += player_speed
 
-        player_nave_rect.centerx = player_rect.centerx
+        # Vertical
+        if keys[pygame.K_UP] and player_rect.top > 0:
+            player_rect.y -= player_speed
+        if keys[pygame.K_DOWN] and player_rect.bottom < HEIGHT:
+            player_rect.y += player_speed
 
-        if (keys[pygame.K_w] or keys[pygame.K_UP]) and player_nave_rect.top > 0:
-            player_nave_rect.y -= player_nave_speed
-        if (keys[pygame.K_s] or keys[pygame.K_DOWN]) and player_nave_rect.bottom < HEIGHT:
-            player_nave_rect.y += player_nave_speed
 
         # ---------------------------------------------
         # ATUALIZAÇÕES E COLISÕES
@@ -337,48 +379,50 @@ def start_game(level=1, current_score=0, current_lives=5):
             meteor_rect.y += base_meteor_speed * speed_mult
 
             if meteor_rect.y > HEIGHT:
-                # Reposicionamento
-                meteor_rect.y = random.randint(-100, -40)
-                meteor_rect.x = random.randint(0, WIDTH - meteor_rect.width)
-                score += 1
+                # Reposicionamento (Saiu da tela)
+                meteor_list.remove(meteor_data)
+                score += 1 # Pontuação por desviar
                 if sound_point:
                     sound_point.play()
+                break
 
-            if meteor_rect.colliderect(player_rect):
-                # Lógica de dano pelos três tipos de meteoros
+            # Colisão: Meteoros colidindo com a NAVE (usando player_nave_rect)
+            # OU colidindo com o YODA (usando player_rect)
+            if meteor_rect.colliderect(player_nave_rect) or meteor_rect.colliderect(player_rect):
+                # Lógica de dano pelos tipos de meteoros
                 if meteor_type == 1:
                     lives -= 1 # Meteoro Normal (-1 vida)
-                elif meteor_type == 2:
-                    lives -= 2 # Meteoro Forte (-2 vidas)
                 elif meteor_type == 3:
                     lives -= 3 # Meteoro Level 3 (-3 vidas)
-
-                # Reposiciona o meteoro
-                meteor_rect.y = random.randint(-100, -40)
-                meteor_rect.x = random.randint(0, WIDTH - meteor_rect.width)
+                
+                # Remove o meteoro após a colisão
+                meteor_list.remove(meteor_data)
 
                 if sound_hit and lives > 0:
                     sound_hit.play()
                 if lives <= 0:
                     running = False
+                break
 
         # Naves Inimigas - Colisão e Reposicionamento
         for nave in nave_list:
             nave.y += nave_speed
 
             if nave.y > HEIGHT:
-                nave.y = random.randint(-200, -50)
-                nave.x = random.randint(0, WIDTH - nave.width)
+                # Remove a nave que saiu da tela
+                nave_list.remove(nave)
+                break # Sai do loop para evitar erros com a remoção
 
-            if nave.colliderect(player_rect):
+            # Colisão: Naves inimigas colidindo com a NAVE ou com o YODA
+            if nave.colliderect(player_nave_rect) or nave.colliderect(player_rect):
                 score -= 5
                 lives -= 2 # NAVE TIRA 2 VIDAS
-                nave.y = random.randint(-200, -50)
-                nave.x = random.randint(0, WIDTH - nave.width)
+                nave_list.remove(nave)
                 if sound_hit:
                     sound_hit.play()
                 if lives <= 0:
                     running = False
+                break
 
         # Colisões Tiros
         meteor_to_remove = []
@@ -455,7 +499,7 @@ def start_game(level=1, current_score=0, current_lives=5):
             # TELA DE VITÓRIA INTERMEDIÁRIA
             win_message = f"NÍVEL {level} CONCLUÍDO!"
             next_level_action = True
-            # Mensagem de ação para o próximo nível (Fase 2, Fase 3)
+            # Mensagem para o próximo nível
             action_text = f"Click ESPAÇO para a FASE {level + 1}"
             next_level_start = level + 1
 
@@ -467,7 +511,6 @@ def start_game(level=1, current_score=0, current_lives=5):
         waiting = True
 
         # Posições fixas para a tela de vitória
-        # MODIFICAÇÃO AQUI: De HEIGHT // 2 - 100 para HEIGHT // 2 - 50
         yoda_win_rect.center = (WIDTH // 2, HEIGHT // 2 - 20) 
 
         while waiting:
@@ -478,7 +521,7 @@ def start_game(level=1, current_score=0, current_lives=5):
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         waiting = False
-                        # Retorna para reiniciar (Nível 1) ou avançar
+                        # Retorna para reiniciar Nível 1 ou avançar
                         return True, (score if next_level_action else 0), 5, next_level_start
                     if event.key == pygame.K_ESCAPE:
                         pygame.quit()
@@ -590,10 +633,10 @@ def show_start_screen():
             screen.blit(titulo, (WIDTH//2 - titulo.get_width()//2, 50))
 
             instrucoes = [
-                "Use ← → para mover o Yoda",
-                "Use W / S ou ↑ / ↓ para mover a Nave",
-                "Pressione ESPAÇO para atirar",
-                "Pressione ESPAÇO para iniciar o jogo"
+                "Nave: Use W/S/A/D para mover a nave", 
+                "Yoda: Use ↑/↓/←/→ para mover o Yoda",
+                "Pressione ESPAÇO para TIRO DUPLO",
+                "Sobreviva o tempo limite para avançar de nível"
             ]
 
             y = 180
@@ -607,7 +650,9 @@ def show_start_screen():
             pygame.draw.rect(screen, (0, 0, 20), btn_voltar)
             pygame.draw.rect(screen, WHITE, btn_voltar, 3)
             txt_voltar = small_font.render("Back", True, WHITE)
-            screen.blit(txt_voltar, (btn_voltar.x + 90, btn_voltar.y -0.2))
+            txt_voltar_rect = txt_voltar.get_rect(center=btn_voltar.center)
+            screen.blit(txt_voltar, txt_voltar_rect)
+
 
         pygame.display.update()
 
